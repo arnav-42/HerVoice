@@ -7,3 +7,6 @@ Clone the repo first, then run:
 3) pip install -r requirements.txt  
   
 Command 2 only works on Windows
+
+
+Skeleton - http://getskeleton.com/
