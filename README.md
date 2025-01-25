@@ -1,7 +1,9 @@
 # HerVoice
 InnovateHer Hackathon 2025  
   
-how to run:
-python -m venv venv  
-.\venv\Scripts\Activate (for Windows only, sorry Shreya and Leanor)  
-pip install -r requirements.txt  
+Clone the repo first, then run:  
+1) python -m venv venv  
+2) .\venv\Scripts\Activate  
+3) pip install -r requirements.txt  
+  
+Command 2 only works on Windows
