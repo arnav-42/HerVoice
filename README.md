@@ -2,11 +2,22 @@
 ## Overview
 Keep women informed about pending political actions that could affect them. Stores Congress bills and reports in database, classifies topics with LLM technology, and then pushes alerts to users who have opted to track said topics.
 ### Tech Stack
-Backend: Flask  
-Frontend: HTML/CSS/JS  
-Technologies: Congress API to fetch bill data, Llama-3.3-70b for bill classification using Grok API for fast AI inference  
+- Backend:
+  - Flask
+  - SQLite
+  - SQLAlchemy
+  - Flask-Mail
+  - Flask Extensions  
+- Frontend:
+  - HTML/CSS (with Skeleton)  
+  - JavaScript  
+- Technologies:
+  - Congress API to fetch bill data
+  - Llama-3.3-70b for bill classification
+  - Grok API for fast AI inference  
 ### Media
-View our Figma [here](https://www.figma.com/design/f2T2xYPbOuf5uBQeAcvpPN/Untitled?node-id=0-1&t=rvvZaNZIvsKVM3L3-1).
+- View our Figma [here](https://www.figma.com/design/f2T2xYPbOuf5uBQeAcvpPN/Untitled?node-id=0-1&t=rvvZaNZIvsKVM3L3-1).  
+- Our presentation is [here](https://www.canva.com/design/DAGdQQKBXrU/J5fvwameXF6RvzpHV0lJkA/edit).
 ## Windows Instructions
 After cloning repo:  
 1) `python -m venv venv`  
