@@ -1,119 +1,106 @@
 import requests
-from datetime import datetime, timedelta
-from models import db, Bill
-import os
 from datetime import datetime, timedelta, timezone
+import os
 
-CONGRESS_API_BASE_URL = "https://api.congress.gov/v3/summaries"
+from models import db, Bill
 
 def get_congress_api_url():
-    """Generates the Congress API URL for the last 7 days with API key."""
+    """
+    Generates the Congress API URL for the last 7 days with API key.
+    """
     end_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     start_date = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
     api_key = os.environ.get("CONGRESS_API_KEY")
 
     if not api_key:
-        raise ValueError("Congress API key is missing. Set the CONGRESS_API_KEY environment variable.")
+        raise ValueError("ERROR: Congress API key is missing. Set CONGRESS_API_KEY in your environment.")
 
-    return f"{CONGRESS_API_BASE_URL}?fromDateTime={start_date}&toDateTime={end_date}&sort=updateDate+asc&api_key={api_key}"
+    base_url = "https://api.congress.gov/v3/summaries"
+    # Attach the API key and the date range in the query params
+    url = f"{base_url}?fromDateTime={start_date}&toDateTime={end_date}&sort=updateDate+asc&api_key={api_key}"
+    return url
 
 def fetch_and_store_bills():
+    """
+    Fetch bills from Congress API, store them if they don't exist,
+    and classify them using the Groq classification function.
+    """
     print("Fetching bills from Congress API...")
-
     response = requests.get(get_congress_api_url())
-    if response.status_code == 200:
-        bills_data = response.json().get('summaries', [])
-        print(f"Number of bills retrieved: {len(bills_data)}")
 
-        for bill in bills_data:
-            bill_number = bill['bill']['number']
-            title = bill['bill']['title']
-            action_date = bill['actionDate']
-            action_desc = bill['actionDesc']
-            summary = bill['text']
-
-            print(f"Processing Bill: {bill_number} - {title}")
-
-            # Check for duplicate entry
-            existing_bill = Bill.query.filter_by(bill_number=bill_number).first()
-            if existing_bill:
-                print(f"Duplicate found: {bill_number}, skipping...")
-                continue
-
-            # Save to the database
-            new_bill = Bill(
-                bill_number=bill_number,
-                title=title,
-                action_date=action_date,
-                action_desc=action_desc,
-                summary=summary,
-                category="Pending Classification"
-            )
-            db.session.add(new_bill)
-
-        db.session.commit()
-        print("Bills stored successfully!")
-
-    else:
+    if response.status_code != 200:
         print(f"Error fetching bills: {response.status_code} - {response.text}")
+        return
 
+    bills_data = response.json().get('summaries', [])
+    print(f"Number of bills retrieved: {len(bills_data)}")
+
+    for bill in bills_data:
+        bill_number = bill['bill']['number']
+        title = bill['bill']['title']
+        action_date = bill['actionDate']
+        action_desc = bill['actionDesc']
+        summary = bill['text']
+
+        # Check if this bill_number already exists in DB
+        existing_bill = Bill.query.filter_by(bill_number=bill_number).first()
+        if existing_bill:
+            print(f"Duplicate found: {bill_number}, skipping...")
+            continue
+
+        # Classify the bill with Groq
+        category = classify_bill_with_groq(summary)
+
+        # Create new Bill object and add to the database
+        new_bill = Bill(
+            bill_number=bill_number,
+            title=title,
+            action_date=action_date,
+            action_desc=action_desc,
+            summary=summary,
+            category=category
+        )
+        db.session.add(new_bill)
+
+    db.session.commit()
+    print("Bills stored and classified successfully!")
 
 def classify_bill_with_groq(summary):
-    from groq import Groq
+    """
+    Classify the bill summary using the Groq API.
+    """
+    # If GROQ_API_KEY isn't set, just return "Unclassified"
+    groq_key = os.environ.get("GROQ_API_KEY")
+    if not groq_key:
+        return "Unclassified (Missing GROQ_API_KEY)"
 
-    client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+    try:
+        from groq import Groq
+    except ImportError:
+        print("groq package not installed. Install via pip install groq")
+        return "Unclassified (groq package missing)"
 
+    # Craft a system prompt for classification
     system_prompt = """
     Objective:
-    Your task is to analyze summaries of legislative bills from the U.S. Congress and accurately classify each bill into one of the following seven categories based on the bill's content, intent, and subject matter. Your response should be a single category label from the predefined list below.
+    Your task is to analyze summaries of legislative bills from the U.S. Congress and accurately classify each bill into 
+    one of the following categories based on the bill's content, intent, and subject matter. Your response should be 
+    a single category label from the predefined list below.
 
-    Categories and Detailed Descriptions:
-    - **Reproductive Rights**
-    Bills that address issues related to reproductive healthcare, including but not limited to:
-    Access to abortion services, contraceptive availability and coverage, funding for reproductive health programs (e.g., Planned Parenthood), regulations on fertility treatments, parental leave and maternal health policies.
-
-    - **Environmental Policy**
-    Bills focusing on environmental conservation, sustainability, and climate-related initiatives, including:
-    Climate change mitigation and adaptation measures, clean energy policies (solar, wind, hydro, etc.), pollution control and emission reductions, wildlife and natural habitat protection, regulations on industrial environmental impacts (e.g., carbon emissions, waste disposal), water and air quality standards, legislation on national parks and conservation efforts.
-
-    - **Healthcare**
-    Bills concerning public health systems, insurance, and medical services, including:
-    Universal healthcare and access to medical services, Medicaid, Medicare, and healthcare subsidies, prescription drug pricing and affordability, mental health resources and accessibility, pandemic response measures and preparedness, research funding for diseases and medical conditions, rural healthcare access.
-
-    - **Education**
-    Bills related to education policies at federal, state, and local levels, such as:
-    Public school funding and allocation of resources, student loan policies and financial aid programs, higher education affordability and access, curriculum regulations and educational standards, teacher salaries, training, and recruitment initiatives, school safety measures and mental health support in educational institutions, STEM (Science, Technology, Engineering, and Math) education funding.
-
-    - **Gun Control**
-    Bills that regulate the ownership, distribution, and use of firearms, including:
-    Background checks for firearm purchases, assault weapon bans or restrictions, gun safety regulations (e.g., storage, carrying laws), licensing and registration of firearms, firearms-related public safety measures, laws concerning concealed carry and open carry policies, regulation of firearm manufacturers and sellers.
-
-    - **Immigration**
-    Bills dealing with immigration policies, border control, and legal pathways, such as:
-    Border security measures and funding, pathways to citizenship and residency programs, refugee and asylum policies, deportation and enforcement measures, DACA (Deferred Action for Childhood Arrivals) and related programs, work visas, green card policies, and immigration reform, support for immigrant communities and integration programs.
-
-    - **Civil Rights & Social Justice**
-    Bills focusing on issues related to equal rights, diversity, and social justice, such as:
-    LGBTQ+ rights and anti-discrimination laws, racial and ethnic equality measures, gender equality initiatives (e.g., Equal Pay Act), criminal justice reform and prison system policies, voting rights and election integrity, police reform and community relations, anti-discrimination measures in housing, employment, and education.
+    Categories:
+    - Reproductive Rights
+    - Environmental Policy
+    - Healthcare
+    - Education
+    - Gun Control
+    - Immigration
+    - Civil Rights & Social Justice
 
     Instructions:
-    Read the provided bill summary carefully.
-    Determine the primary focus of the bill based on keywords, themes, and legislative intent.
-    Select the most appropriate category from the seven predefined options. If the bill overlaps multiple categories, choose the one most directly related to the bill's core purpose.
-    Respond only with the category name (e.g., "Healthcare"). Do not provide explanations, justifications, or multiple categories.
-
-    Example Classifications:
-    Example 1: Bill Summary: "A bill to provide funding for rural hospitals and expand Medicare coverage to underserved areas." Correct Classification: "Healthcare"
-    Example 2: Bill Summary: "A bill to ban high-capacity magazines and require universal background checks for firearm purchases." Correct Classification: "Gun Control"
-    Example 3: Bill Summary: "A resolution to uphold LGBTQ+ rights by implementing anti-discrimination policies in the workplace." Correct Classification: "Civil Rights & Social Justice"
-    Example 4: Bill Summary: "A bill to reduce greenhouse gas emissions and promote renewable energy initiatives across the country." Correct Classification: "Environmental Policy"
-
-    Additional Considerations:
-    If a bill does not clearly fit any category, classify it based on its primary objective, even if secondary topics are present.
-    Ensure accuracy and consistency in classification.
-    Be mindful of legislative language and phrasing that might indirectly reference a category (e.g., "public health initiatives" can imply "Healthcare").
-    By following these guidelines, you will provide precise and meaningful classifications for legislative bills, ensuring users receive relevant notifications based on their selected interests.
+    Respond only with the correct category name. No additional text or explanation.
     """
+
+    client = Groq(api_key=groq_key)
 
     response = client.chat.completions.create(
         messages=[
@@ -123,4 +110,7 @@ def classify_bill_with_groq(summary):
         model="llama-3.3-70b-versatile"
     )
 
-    return response.choices[0].message.content.strip()
+    if hasattr(response, 'choices') and len(response.choices) > 0:
+        return response.choices[0].message.content.strip()
+
+    return "Unclassified (No valid response from Groq)"

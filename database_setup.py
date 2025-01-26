@@ -1,11 +1,8 @@
 import sys
 import os
+from app import app, db
 
-# Add the project root directory to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from app import db, app
-
+# Make sure the app context is set so db.create_all() works properly
 with app.app_context():
     db.create_all()
     print("Database initialized successfully!")

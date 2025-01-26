@@ -1,12 +1,8 @@
 # HerVoice
 InnovateHer Hackathon 2025  
   
-Clone the repo first, then run:  
+On Windows, clone the repo first, then run:  
 1) python -m venv venv  
-2) .\venv\Scripts\Activate  
-3) pip install -r requirements.txt  
-  
-Command 2 only works on Windows
-
-
-Skeleton - http://getskeleton.com/
+2) Set-ExecutionPolicy Unrestricted -Scope Process -Force  
+3) .\venv\Scripts\Activate  
+4) pip install -r requirements.txt  (if you don't have the requirements already)
