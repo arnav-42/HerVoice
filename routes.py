@@ -1,43 +1,61 @@
-from flask import request, render_template, redirect, url_for
-from models import db, User
+from flask import request, session, redirect, url_for, render_template
+from extensions import db
+from models import User
 
 def configure_routes(app):
-    @app.route('/signup', methods=['GET', 'POST'])
-    def signup():
+    @app.route('/')
+    def home():
+        # We’ll just redirect to /index for the main front-end page
+        return redirect(url_for('index'))
+
+    @app.route('/index')
+    def index():
         """
-        Example route to sign up a new user.
+        Renders index.html which has email-only login and category selection.
         """
-        if request.method == 'POST':
-            email = request.form['email']
-            interests = request.form['interests']
-            location = request.form['location']
-            
-            # Simple check to see if the user already exists
-            existing_user = User.query.filter_by(email=email).first()
-            if existing_user:
-                return "User already registered!", 400
-            
-            new_user = User(email=email, interests=interests, location=location)
+        return render_template('index.html')
+
+    @app.route('/process-login', methods=['POST'])
+    def process_login():
+        """
+        Processes the email form. If user doesn't exist, create them.
+        """
+        email = request.form.get('email')
+        if not email:
+            return "Email required", 400
+
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            # Create a new user if not found
+            new_user = User(email=email, interests="")
             db.session.add(new_user)
             db.session.commit()
-            return redirect(url_for('dashboard'))
-        
-        # In a real app, you'd return a template with a signup form
-        return """
-        <form method="POST">
-          Email: <input type="text" name="email"><br>
-          Interests: <input type="text" name="interests"><br>
-          Location: <input type="text" name="location"><br>
-          <input type="submit" value="Sign Up">
-        </form>
-        """
+            session['user_id'] = new_user.id
+        else:
+            # "Log in" existing user
+            session['user_id'] = user.id
 
-    @app.route('/dashboard')
-    def dashboard():
+        return "OK"
+
+    @app.route('/process-categories', methods=['POST'])
+    def process_categories():
         """
-        Example dashboard showing all users. 
-        In a real app, you'd likely use a template here.
+        Stores the user's category selections in the database.
         """
-        users = User.query.all()
-        user_list = [f"{u.email} | Interests: {u.interests} | Location: {u.location}" for u in users]
-        return "<br>".join(user_list)
+        if 'user_id' not in session:
+            return "Not logged in", 403
+
+        user = User.query.get(session['user_id'])
+        if not user:
+            return "User not found", 404
+
+        categories = request.form.getlist('categories')
+        user.interests = ",".join(categories)
+        db.session.commit()
+
+        return "OK"
+
+    @app.route('/logout')
+    def logout():
+        session.clear()
+        return redirect(url_for('index'))

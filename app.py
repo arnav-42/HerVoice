@@ -1,47 +1,53 @@
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from apscheduler.schedulers.background import BackgroundScheduler
 import os
 
-# Local imports
-from models import db
-from routes import configure_routes
+# Use the *standard* BackgroundScheduler from apscheduler, not flask_apscheduler
+from apscheduler.schedulers.background import BackgroundScheduler
+
+from extensions import db, mail
+
+def create_app():
+    app = Flask(__name__)
+    app.config["SECRET_KEY"] = "your_secret"
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bills.db'
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    # Mail config
+    app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+    app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+    app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', '')
+    app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', '')
+    app.config['MAIL_USE_TLS'] = True
+    app.config['MAIL_USE_SSL'] = False
+
+    db.init_app(app)
+    mail.init_app(app)
+
+    from routes import configure_routes
+    configure_routes(app)
+
+    return app
+
+app = create_app()
+
+# Set up the APScheduler job to fetch bills periodically
 from services import fetch_and_store_bills
 
-app = Flask(__name__)
+scheduler = BackgroundScheduler()
 
-# Configure the database URI (e.g., SQLite)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bills.db?check_same_thread=False' # CHANGE IF BREAK!!!! delete ? and after
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+def run_fetch_job():
+    """
+    This function wraps the fetch job in an app context so we can safely
+    use the DB, mail, etc.
+    """
+    with app.app_context():
+        fetch_and_store_bills()
 
-# Initialize the database with the Flask app
-db.init_app(app)
-
-# Register routes from routes.py
-configure_routes(app)
-
-# Scheduler setup to run fetch_and_store_bills every minute
-scheduler = BackgroundScheduler(daemon=True)
-scheduler.add_job(fetch_and_store_bills, 'interval', minutes=1)
+# Example: run the fetch job every minute
+scheduler.add_job(run_fetch_job, 'interval', minutes=1)
 scheduler.start()
 
-@app.route('/')
-def home():
-    """
-    Simple homepage to confirm the app is running.
-    """
-    return "Bill tracking app is running!"
-
-@app.route('/update-bills')
-def update_bills():
-    """
-    Manually trigger a bill update/fetch.
-    """
-    fetch_and_store_bills()
-    return "Bills have been fetched, stored, and classified!"
-
-if __name__ == '__main__':
-    # Create all tables if they don't exist
+if __name__ == "__main__":
     with app.app_context():
         db.create_all()
     app.run(debug=True)
