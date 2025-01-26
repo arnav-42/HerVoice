@@ -1,9 +1,6 @@
 from flask import Flask
 import os
-
-# Use the *standard* BackgroundScheduler from apscheduler, not flask_apscheduler
 from apscheduler.schedulers.background import BackgroundScheduler
-
 from extensions import db, mail
 
 def create_app():
@@ -13,8 +10,8 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     # Mail config
-    app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-    app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+    app.config['MAIL_SERVER'] = "smtp.gmail.com" #os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+    app.config['MAIL_PORT'] = 587 #int(os.environ.get('MAIL_PORT', 587))
     app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', '')
     app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', '')
     app.config['MAIL_USE_TLS'] = True
@@ -30,7 +27,6 @@ def create_app():
 
 app = create_app()
 
-# Set up the APScheduler job to fetch bills periodically
 from services import fetch_and_store_bills
 
 scheduler = BackgroundScheduler()
@@ -50,4 +46,7 @@ scheduler.start()
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
+        # **Immediately fetch bills on startup:**
+        fetch_and_store_bills()  
+    # Now run the app
     app.run(debug=True)

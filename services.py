@@ -45,6 +45,7 @@ def fetch_and_store_bills():
 
             existing_bill = Bill.query.filter_by(bill_number=bill_number).first()
             if existing_bill:
+                # Skip if we've already seen it
                 continue
 
             category = classify_bill_with_groq(summary)
@@ -62,6 +63,7 @@ def fetch_and_store_bills():
 
         db.session.commit()
 
+        # Notify interested users about each new bill
         for bill in new_bills:
             notify_users_of_new_bill(bill)
 
@@ -135,14 +137,63 @@ def notify_users_of_new_bill(bill):
         )
         send_email(user.email, subject, body)
 
+def send_all_relevant_bills_to_user(user):
+    """
+    For a given user, finds all bills matching the user's category interests
+    and emails them in a single message.
+    """
+    if not user.interests:
+        return  # User didn't pick any interests yet.
+
+    # Convert user interests (e.g. "Healthcare,Education") to a lowercase list
+    user_categories = [cat.strip().lower() for cat in user.interests.split(",") if cat.strip()]
+
+    # Get all bills from the database
+    all_bills = Bill.query.all()
+
+    # Filter out only those bills whose category is in the user's interests
+    relevant_bills = [
+        bill for bill in all_bills
+        if bill.category and bill.category.lower() in user_categories
+    ]
+
+    if not relevant_bills:
+        return  # No matching bills => skip sending
+
+    # Build up the email message with all relevant bills in one email
+    lines = []
+    lines.append(f"Hello {user.email},")
+    lines.append("Here are the existing bills matching your category interests:")
+    lines.append("")
+    for bill in relevant_bills:
+        lines.append(f"Bill Number: {bill.bill_number}")
+        lines.append(f"Title: {bill.title}")
+        lines.append(f"Category: {bill.category}")
+        lines.append(f"Action Date: {bill.action_date}")
+        lines.append(f"Action Description: {bill.action_desc}")
+        lines.append("Summary:")
+        lines.append(bill.summary)
+        lines.append("\n" + "-"*40 + "\n")
+    lines.append("Regards,\nHer Voice Team")
+
+    body = "\n".join(lines)
+    send_email(user.email, "Your Relevant Bills", body)
+
+#
+# **Single** send_email definition
+#
 def send_email(to_email, subject, body):
     """
     Send an email via Flask-Mail.
     """
-    msg = Message(
-        subject=subject,
-        recipients=[to_email],
-        body=body,
-        sender=current_app.config['MAIL_USERNAME'] or "noreply@example.com"
-    )
-    mail.send(msg)
+    try:
+        msg = Message(
+            subject=subject,
+            recipients=[to_email],
+            body=body,
+            sender=current_app.config['MAIL_USERNAME']# or "noreply@example.com"
+        )
+        mail.send(msg)
+        print(f"[DEBUG] Email sent to {to_email} with subject '{subject}'.")
+    except Exception as e:
+        print(f"[ERROR] Could not send email to {to_email}: {e}")

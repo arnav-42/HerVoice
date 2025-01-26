@@ -15,7 +15,7 @@
 </head>
 <body class="bg-pink-100">
 
-<!-- Login Screen (Now only asks for Email) -->
+<!-- Login Screen -->
 <div class="min-h-screen flex items-center justify-center bg-blue-100" id="loginScreen">
   <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
     <h1 class="text-2xl font-bold text-center text-pink-600 mb-6">Her Voice</h1>
@@ -83,26 +83,24 @@
 <div class="min-h-screen bg-blue-100 hidden" id="mainContentScreen">
   <div class="container mx-auto p-4">
     <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-pink-600">
-        Her Voice
-      </h1>
+      <h1 class="text-2xl font-bold text-pink-600">Her Voice</h1>
       <a href="/logout" class="bg-pink-600 text-white py-2 px-4 rounded-lg hover:bg-pink-700" id="logoutButton">
         Logout
       </a>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div class="bg-white p-4 rounded-lg shadow-lg">
-        <h2 class="text-xl font-bold text-pink-600 mb-4">Today's Stories</h2>
-        <!-- You can add any content here -->
+    <!-- Two columns: 1) Relevant Bills, 2) User's Interests -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Left: Relevant Bills -->
+      <div class="bg-white p-4 rounded-lg shadow-lg" id="relevantBillsContainer">
+        <h2 class="text-xl font-bold text-pink-600 mb-4">Relevant Bills</h2>
+        <ul id="relevantBillsList" class="list-disc pl-5"></ul>
       </div>
+
+      <!-- Right: User's selected interests -->
       <div class="bg-white p-4 rounded-lg shadow-lg">
-        <h2 class="text-xl font-bold text-pink-600 mb-4">Bookmarks</h2>
-        <!-- You can add any content here -->
-      </div>
-      <div class="bg-white p-4 rounded-lg shadow-lg">
-        <h2 class="text-xl font-bold text-pink-600 mb-4">Policies</h2>
-        <!-- You can add any content here -->
+        <h2 class="text-xl font-bold text-pink-600 mb-4">Your Selected Interests</h2>
+        <ul id="userInterestsList" class="list-disc pl-5"></ul>
       </div>
     </div>
   </div>
@@ -117,9 +115,12 @@
   loginForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const formData = new FormData(loginForm);
+
     fetch('/process-login', {
       method: 'POST',
-      body: formData
+      body: formData,
+      // IMPORTANT: allow Flask to set and receive the session cookie
+      credentials: 'include'
     })
     .then(res => {
       if(res.ok) {
@@ -136,20 +137,69 @@
   categoryForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const formData = new FormData(categoryForm);
+
     fetch('/process-categories', {
       method: 'POST',
-      body: formData
+      body: formData,
+      // Same fix here
+      credentials: 'include'
     })
     .then(res => {
       if(res.ok) {
         document.getElementById('categoryScreen').classList.add('hidden');
         document.getElementById('mainContentScreen').classList.remove('hidden');
+        // Once mainContentScreen is visible, fetch relevant data
+        loadMainContent();
       } else {
         alert("Failed to set categories");
       }
     })
     .catch(err => console.error(err));
   });
+
+  function loadMainContent() {
+    // 1) Fetch relevant bills
+    fetch('/api/relevant-bills', { credentials: 'include' })
+      .then(response => response.json())
+      .then(data => {
+        const listEl = document.getElementById('relevantBillsList');
+        listEl.innerHTML = ''; // clear existing
+        if(Array.isArray(data) && data.length) {
+          data.forEach(bill => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+              <strong>${bill.bill_number}</strong> — ${bill.title}
+              <br/><em>Category:</em> ${bill.category}
+              <br/><em>Action Date:</em> ${bill.action_date}
+              <br/><em>Action Desc:</em> ${bill.action_desc}
+              <br/><em>Summary:</em> ${bill.summary}
+            `;
+            listEl.appendChild(li);
+          });
+        } else {
+          listEl.innerHTML = '<li>No relevant bills found.</li>';
+        }
+      })
+      .catch(console.error);
+
+    // 2) Fetch user interests
+    fetch('/api/user-interests', { credentials: 'include' })
+      .then(response => response.json())
+      .then(categories => {
+        const interestsEl = document.getElementById('userInterestsList');
+        interestsEl.innerHTML = '';
+        if(Array.isArray(categories) && categories.length) {
+          categories.forEach(cat => {
+            const li = document.createElement('li');
+            li.textContent = cat;
+            interestsEl.appendChild(li);
+          });
+        } else {
+          interestsEl.innerHTML = '<li>No interests selected.</li>';
+        }
+      })
+      .catch(console.error);
+  }
 </script>
 
 </body>
