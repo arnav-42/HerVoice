@@ -1,6 +1,6 @@
 # HerVoice
 ## Overview
-[![HerVoice_logo](https://github.com/arnav-42/HerVoice/blob/main/image.jpg?raw=true)](https://github.com/arnav-42/HerVoice/blob/main/static/images/Screenshot_2025-01-26_154744.png?raw=true)
+[![HerVoice_logo](https://github.com/arnav-42/HerVoice/blob/main/image.jpg?raw=true)](https://github.com/arnav-42/HerVoice/blob/main/static/Screenshot_2025-01-26_154744.png?raw=true)
 Keep women informed about pending political actions that could affect them. Stores Congress bills and reports in database, classifies topics with LLM technology, and then pushes alerts to users who have opted to track said topics.
 ### Tech Stack
 - Backend:
