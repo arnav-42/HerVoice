@@ -16,10 +16,13 @@ Keep women informed about pending political actions that could affect them. Stor
 - Technologies:
   - Congress API to fetch bill data
   - Llama-3.3-70b for bill classification
-  - Grok API for fast AI inference  
+  - Grok API for fast AI inference
+  
+![HerVoice Logo](https://github.com/arnav-42/HerVoice/blob/main/static/sample_db_pic.png?raw=true)  
 ### Media
-- View our Figma [here](https://www.figma.com/design/f2T2xYPbOuf5uBQeAcvpPN/Untitled?node-id=0-1&t=rvvZaNZIvsKVM3L3-1).  
-- Our presentation is [here](https://www.canva.com/design/DAGdQQKBXrU/J5fvwameXF6RvzpHV0lJkA/edit).
+- View our presentation [here](https://www.canva.com/design/DAGdQQKBXrU/J5fvwameXF6RvzpHV0lJkA/edit).
+- Our Figma is [here](https://www.figma.com/design/f2T2xYPbOuf5uBQeAcvpPN/Untitled?node-id=0-1&t=rvvZaNZIvsKVM3L3-1).  
+
 ## Windows Instructions
 After cloning repo:  
 1) `python -m venv venv`  
